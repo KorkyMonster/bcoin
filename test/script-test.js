@@ -3,7 +3,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const Script = require('../lib/script/script');
 const Witness = require('../lib/script/witness');
 const Stack = require('../lib/script/stack');
@@ -12,7 +12,8 @@ const TX = require('../lib/primitives/tx');
 const consensus = require('../lib/protocol/consensus');
 const {fromFloat} = require('../lib/utils/fixed');
 
-const scripts = require('./data/script-tests.json');
+// test files: https://github.com/bitcoin/bitcoin/tree/master/src/test/data
+const scripts = require('./data/core-data/script-tests.json');
 
 function isSuccess(stack) {
   if (stack.length === 0)
@@ -335,7 +336,7 @@ describe('Script', function() {
         }
 
         if (expected !== 'OK') {
-          assert.typeOf(err, 'error');
+          assert(err instanceof Error);
           assert.strictEqual(err.code, expected);
           return;
         }

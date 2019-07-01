@@ -3,7 +3,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const common = require('./util/common');
 const {BloomFilter} = require('bfilter');
 const {BufferMap} = require('buffer-map');
@@ -11,6 +11,7 @@ const Block = require('../lib/primitives/block');
 const MerkleBlock = require('../lib/primitives/merkleblock');
 const consensus = require('../lib/protocol/consensus');
 const Script = require('../lib/script/script');
+const nodejsUtil = require('util');
 const bip152 = require('../lib/net/bip152');
 const CompactBlock = bip152.CompactBlock;
 const TXRequest = bip152.TXRequest;
@@ -27,6 +28,9 @@ const block426884 = common.readBlock('block426884');
 const compact426884 = common.readCompact('compact426884');
 const block898352 = common.readBlock('block898352');
 const compact898352 = common.readCompact('compact898352');
+
+// Small SegWit block test vector
+const block482683 = common.readBlock('block482683');
 
 // Sigops counting test vectors
 // Format: [name, sigops, weight]
@@ -100,6 +104,14 @@ describe('Block', function() {
     assert.strictEqual(block2.rhash(),
       '0000000000000000821c4e0acc40f88bedbce3b73ba2358b5ade58a9022cc78c');
     assert.bufferEqual(block2.merkleRoot, block2.createMerkleRoot());
+  });
+
+  it('should inspect a block with a witness commitment', () => {
+    const [block] = block482683.getBlock();
+    const fmt = nodejsUtil.format(block);
+    assert(typeof fmt === 'string');
+    assert(fmt.includes('Block'));
+    assert(fmt.includes('commitmentHash'));
   });
 
   it('should create a merkle block', () => {
@@ -363,4 +375,91 @@ describe('Block', function() {
       });
     }
   }
+
+  it('should deserialize with offset positions for txs (witness)', () => {
+    const [block] = block482683.getBlock();
+
+    const expected = [
+      {offset: 81, size: 217},
+      {offset: 298, size: 815},
+      {offset: 1113, size: 192},
+      {offset: 1305, size: 259},
+      {offset: 1564, size: 223},
+      {offset: 1787, size: 1223},
+      {offset: 3010, size: 486},
+      {offset: 3496, size: 665},
+      {offset: 4161, size: 3176},
+      {offset: 7337, size: 225},
+      {offset: 7562, size: 1223},
+      {offset: 8785, size: 503}
+    ];
+
+    assert.equal(expected.length, block.txs.length);
+    assert.equal(block.getSize(), expected.reduce((a, b) => a + b.size, 81));
+
+    for (let i = 0; i < block.txs.length; i++) {
+      const {offset, size} = block.txs[i].getPosition();
+
+      assert.strictEqual(offset, expected[i].offset);
+      assert.strictEqual(size, expected[i].size);
+    }
+  });
+
+  it('should serialize with offset positions for txs (witness)', () => {
+    const [block] = block482683.getBlock();
+
+    const expected = [
+      {offset: 81, size: 217},
+      {offset: 298, size: 815},
+      {offset: 1113, size: 192},
+      {offset: 1305, size: 259},
+      {offset: 1564, size: 223},
+      {offset: 1787, size: 1223},
+      {offset: 3010, size: 486},
+      {offset: 3496, size: 665},
+      {offset: 4161, size: 3176},
+      {offset: 7337, size: 225},
+      {offset: 7562, size: 1223},
+      {offset: 8785, size: 503}
+    ];
+
+    assert.equal(expected.length, block.txs.length);
+    assert.equal(block.getSize(), expected.reduce((a, b) => a + b.size, 81));
+
+    // Reset the offset for all transactions, and clear
+    // any cached values for the block.
+    block.refresh(true);
+    for (let i = 0; i < block.txs.length; i++)
+      assert.equal(block.txs[i]._offset, -1);
+
+    // Serialize the block, as done before saving to disk.
+    const raw = block.toRaw();
+    assert(raw);
+
+    for (let i = 0; i < block.txs.length; i++) {
+      const {offset, size} = block.txs[i].getPosition();
+
+      assert.strictEqual(offset, expected[i].offset);
+      assert.strictEqual(size, expected[i].size);
+    }
+  });
+
+  it('should deserialize with offset positions for txs', () => {
+    const [block] = block300025.getBlock();
+
+    assert.equal(block.txs.length, 461);
+
+    let expect = 83;
+    let total = 83;
+
+    for (let i = 0; i < block.txs.length; i++) {
+      const {offset, size} = block.txs[i].getPosition();
+
+      assert.strictEqual(offset, expect);
+      expect += size;
+      total += size;
+    }
+
+    assert.equal(total, 284231);
+  });
 });

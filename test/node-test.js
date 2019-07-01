@@ -3,7 +3,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const consensus = require('../lib/protocol/consensus');
 const Coin = require('../lib/primitives/coin');
 const Script = require('../lib/script/script');
@@ -16,12 +16,26 @@ const Peer = require('../lib/net/peer');
 const InvItem = require('../lib/primitives/invitem');
 const invTypes = InvItem.types;
 
+const ports = {
+  p2p: 49331,
+  node: 49332,
+  wallet: 49333
+};
+
 const node = new FullNode({
   memory: true,
   apiKey: 'foo',
   network: 'regtest',
   workers: true,
-  plugins: [require('../lib/wallet/plugin')]
+  workersSize: 2,
+  plugins: [require('../lib/wallet/plugin')],
+  indexTX: true,
+  indexAddress: true,
+  port: ports.p2p,
+  httpPort: ports.node,
+  env: {
+    'BCOIN_WALLET_HTTP_PORT': ports.wallet.toString()
+  }
 });
 
 const chain = node.chain;
@@ -491,11 +505,11 @@ describe('Node', function() {
       id: '1'
     }, {});
 
-    assert.typeOf(json.result, 'object');
-    assert.typeOf(json.result.curtime, 'number');
-    assert.typeOf(json.result.mintime, 'number');
-    assert.typeOf(json.result.maxtime, 'number');
-    assert.typeOf(json.result.expires, 'number');
+    assert(typeof json.result === 'object');
+    assert(Number.isInteger(json.result.curtime));
+    assert(Number.isInteger(json.result.mintime));
+    assert(Number.isInteger(json.result.maxtime));
+    assert(Number.isInteger(json.result.expires));
 
     assert.deepStrictEqual(json, {
       result: {
@@ -580,8 +594,8 @@ describe('Node', function() {
       isvalid: true,
       address: addr.toString(node.network),
       scriptPubKey: Script.fromAddress(addr, node.network).toJSON(),
-      ismine: false,
-      iswatchonly: false
+      isscript: false,
+      iswitness: false
     });
   });
 
@@ -743,6 +757,23 @@ describe('Node', function() {
     await node.sendTX(tx1); // add TX to inventory
     const tx2 = node.pool.getBroadcasted(dummyPeer, txItem);
     assert.strictEqual(tx1.txid(), tx2.txid());
+  });
+
+  it('should get tx by hash', async () => {
+    const block = await mineBlock();
+    await chain.add(block);
+
+    const tx = block.txs[0];
+    const hash = tx.hash();
+    const hasTX = await node.hasTX(hash);
+
+    assert.strictEqual(hasTX, true);
+
+    const tx2 = await node.getTX(hash);
+    assert.strictEqual(tx.txid(), tx2.txid());
+
+    const meta = await node.getMeta(hash);
+    assert.strictEqual(meta.tx.txid(), tx2.txid());
   });
 
   it('should cleanup', async () => {

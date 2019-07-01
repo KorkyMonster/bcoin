@@ -6,7 +6,7 @@
 const bio = require('bufio');
 const util = require('../lib/utils/util');
 const Input = require('../lib/primitives/input');
-const assert = require('./util/assert');
+const assert = require('bsert');
 const common = require('./util/common');
 
 // Take input rawbytes from the raw data format
@@ -22,7 +22,8 @@ const input2 = tx2.getRaw().slice(152, 339);
 const tx3 = common.readTX('tx4');
 const input3 = tx3.getRaw().slice(5, 266);
 
-const bip69tests = require('./data/bip69');
+// test files: https://github.com/bitcoinjs/bip69/blob/master/test/fixtures.json
+const bip69tests = require('./data/bip69/bip69.json');
 
 describe('Input', function() {
   it('should return same raw', () => {
